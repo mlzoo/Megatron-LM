@@ -481,11 +481,11 @@ def test_get_batch_on_this_cp_rank_per_sequence_balancing(cp_size, seq_length):
         }
 
         mock_group = MagicMock()
-        with patch('torch.distributed.get_world_size', return_value=cp_size), \
-             patch('torch.distributed.get_rank', return_value=cp_rank):
-            result = _get_batch_on_this_cp_rank_per_sequence_balancing(
-                batch, cp_group=mock_group
-            )
+        with (
+            patch('torch.distributed.get_world_size', return_value=cp_size),
+            patch('torch.distributed.get_rank', return_value=cp_rank),
+        ):
+            result = _get_batch_on_this_cp_rank_per_sequence_balancing(batch, cp_group=mock_group)
 
         if cp_size == 1:
             assert torch.equal(result['tokens'], tokens)
@@ -495,13 +495,15 @@ def test_get_batch_on_this_cp_rank_per_sequence_balancing(cp_size, seq_length):
             chunk_size = seq_length // (2 * cp_size)
             chunk_0_start = cp_rank * chunk_size
             chunk_1_start = (2 * cp_size - cp_rank - 1) * chunk_size
-            expected = torch.cat([
-                tokens[0, chunk_0_start : chunk_0_start + chunk_size],
-                tokens[0, chunk_1_start : chunk_1_start + chunk_size],
-            ]).unsqueeze(0)
-            assert torch.equal(result['tokens'], expected), (
-                f"cp_rank={cp_rank}: expected {expected}, got {result['tokens']}"
-            )
+            expected = torch.cat(
+                [
+                    tokens[0, chunk_0_start : chunk_0_start + chunk_size],
+                    tokens[0, chunk_1_start : chunk_1_start + chunk_size],
+                ]
+            ).unsqueeze(0)
+            assert torch.equal(
+                result['tokens'], expected
+            ), f"cp_rank={cp_rank}: expected {expected}, got {result['tokens']}"
 
         # cu_seqlens and max_seqlen must be unchanged.
         assert torch.equal(result['cu_seqlens'], cu_seqlens)
